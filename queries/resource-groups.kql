@@ -1,0 +1,4 @@
+ResourceContainers
+| where type =~ 'microsoft.resources/subscriptions/resourcegroups'
+| project id, name, subscriptionId, tags
+| order by id asc

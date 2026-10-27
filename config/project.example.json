@@ -1,0 +1,19 @@
+{
+  "projectId": "example-project",
+  "tenantId": "00000000-0000-0000-0000-000000000001",
+  "subscriptions": ["00000000-0000-0000-0000-000000000002"],
+  "workspaces": ["/subscriptions/00000000-0000-0000-0000-000000000002/resourceGroups/monitoring/providers/Microsoft.OperationalInsights/workspaces/overview"],
+  "tagAliases": ["environment-name", "deploymentEnvironment"],
+  "classificationOverrides": {},
+  "resourceOverrides": {},
+  "parentOverrides": {},
+  "namingRules": [],
+  "endpoints": [],
+  "existingEndpointQueries": [],
+  "discoverReadinessProbes": true,
+  "freshnessSeconds": 300,
+  "concurrency": 10,
+  "timeoutSeconds": 10,
+  "maxRunSeconds": 50,
+  "ingestion": {"endpoint": "", "ruleId": "", "stream": "Custom-EnvironmentOverview"}
+}

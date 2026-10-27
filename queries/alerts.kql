@@ -1,0 +1,5 @@
+AlertsManagementResources
+| where type =~ 'microsoft.alertsmanagement/alerts'
+| where tostring(properties.essentials.monitorCondition) =~ 'Fired'
+| project id, targetResource=tostring(properties.essentials.targetResource), severity=tostring(properties.essentials.severity), reason=tostring(properties.essentials.description)
+| order by id asc

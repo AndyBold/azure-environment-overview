@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Azure Environment Overview project configuration",
+  "type": "object",
+  "required": ["projectId", "tenantId", "subscriptions", "workspaces"],
+  "properties": {
+    "projectId": {"type":"string", "pattern":"^[A-Za-z0-9_-]{1,64}$"},
+    "tenantId": {"type":"string", "minLength":1},
+    "subscriptions": {"type":"array", "minItems":1, "uniqueItems":true, "items":{"type":"string", "minLength":1}},
+    "workspaces": {"type":"array", "items":{"type":"string"}},
+    "tagAliases": {"type":"array", "items":{"type":"string"}},
+    "classificationOverrides": {"type":"object", "additionalProperties":{"enum":["production","nonproduction","shared","unclassified"]}},
+    "resourceOverrides": {"type":"object", "additionalProperties":{"type":"string", "minLength":1}},
+    "parentOverrides": {"type":"object", "additionalProperties":{"type":"string"}},
+    "namingRules": {"type":"array", "items":{"type":"object", "required":["token","environment"], "properties":{"token":{"type":"string","minLength":1},"environment":{"type":"string","minLength":1}}}},
+    "endpoints": {"type":"array", "items":{"type":"object", "required":["resourceId","checkId","url"], "properties":{
+      "resourceId":{"type":"string","pattern":"^/[sS]ubscriptions/"},
+      "checkId":{"type":"string","minLength":1}, "url":{"type":"string","format":"uri"},
+      "headerEnv":{"type":"object","additionalProperties":{"type":"string"}},
+      "tokenScope":{"type":"string"}, "revision":{"type":"string"},
+      "expectedCodes":{"type":"array","minItems":1,"items":{"type":"integer","minimum":100,"maximum":599}},
+      "timeoutSeconds":{"type":"integer","minimum":1,"maximum":20}
+    }, "additionalProperties":false}},
+    "existingEndpointQueries": {"type":"array", "items":{"type":"object", "required":["workspaceResourceId","query","checks"],"properties":{
+      "workspaceResourceId":{"type":"string"},"query":{"type":"string","minLength":1},
+      "checks":{"type":"array","minItems":1,"items":{"type":"object","required":["resourceId","checkId"],"properties":{"resourceId":{"type":"string"},"checkId":{"type":"string","minLength":1}}}}
+    }}},
+    "discoverReadinessProbes":{"type":"boolean"},
+    "freshnessSeconds":{"type":"integer","minimum":60,"maximum":3600,"default":300},
+    "concurrency":{"type":"integer","minimum":1,"maximum":50,"default":10},
+    "timeoutSeconds":{"type":"integer","minimum":1,"maximum":20,"default":10},
+    "maxRunSeconds":{"type":"integer","minimum":10,"maximum":50,"default":50},
+    "ingestion":{"type":"object","properties":{"endpoint":{"type":"string"},"ruleId":{"type":"string"},"stream":{"type":"string"}}}
+  },
+  "additionalProperties": false
+}

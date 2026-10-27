@@ -1,0 +1,25 @@
+// __PROJECT__ is substituted with a validated project identifier by the generator.
+let allData = materialize(EnvironmentOverview_CL
+    | where TimeGenerated > ago(2d) and ProjectId == '__PROJECT__');
+let observedCounts = allData | where RowKind == 'resource'
+    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;
+let completeRuns = allData | where RowKind == 'run' and HealthComplete == true
+    | summarize arg_max(TimeGenerated, *) by RunId
+    | join kind=leftouter observedCounts on RunId
+    | extend ActualCount=coalesce(ActualCount, long(0))
+    | where ExpectedCount == ActualCount;
+let latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);
+let resources = allData | where RowKind == 'resource' and RunId == latestRun
+    | summarize arg_max(TimeGenerated, *) by ResourceId
+    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),
+             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),
+             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)
+    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),
+             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),
+             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',
+                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)
+    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',
+                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',
+                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')
+    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT — ', Reason), Reason),
+             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);

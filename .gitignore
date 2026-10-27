@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.superpowers/
+.obsidian/
+config/project.json
+dist/*.json
+!dist/.gitkeep
+!dist/workbook.json

@@ -1,0 +1,1255 @@
+{
+  "version": "Notebook/1.0",
+  "items": [
+    {
+      "type": 1,
+      "name": "intro",
+      "content": {
+        "json": "# Non-production environment overview\nDiscovered resources and evidence-based health. **Grey means unknown.** Red, amber, grey and green have equal resource weighting. Production classifications are inferred: review overrides before relying on exclusions.\n\nEnable **Auto refresh \u2192 5 minutes** each time you open this Workbook. Checks run independently every minute. Use the grid search to find a resource. Clear the environment selection by selecting All in SelectedEnvironment."
+      }
+    },
+    {
+      "type": 9,
+      "name": "parameters",
+      "content": {
+        "version": "KqlParameterItem/1.0",
+        "parameters": [
+          {
+            "id": "0fcb4b55-5551-5422-9f64-d06f6ab2d49f",
+            "version": "KqlParameterItem/1.0",
+            "name": "Subscriptions",
+            "type": 6,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "value": [
+              "00000000-0000-0000-0000-000000000002"
+            ]
+          },
+          {
+            "id": "9e77f5ca-764a-5733-8227-29bfa8fe3731",
+            "version": "KqlParameterItem/1.0",
+            "name": "Workspaces",
+            "type": 5,
+            "isRequired": true,
+            "multiSelect": true,
+            "quote": "'",
+            "delimiter": ",",
+            "value": [
+              "/subscriptions/00000000-0000-0000-0000-000000000002/resourceGroups/monitoring/providers/Microsoft.OperationalInsights/workspaces/overview"
+            ],
+            "typeSettings": {
+              "resourceTypeFilter": {
+                "microsoft.operationalinsights/workspaces": true
+              }
+            }
+          },
+          {
+            "id": "6321a3b2-0caf-5ac6-9a7f-8f3ccf923c78",
+            "version": "KqlParameterItem/1.0",
+            "name": "Visibility",
+            "type": 2,
+            "isRequired": true,
+            "value": "nonproduction",
+            "jsonData": "[{\"value\": \"nonproduction\", \"label\": \"nonproduction\"}, {\"value\": \"all\", \"label\": \"all\"}]"
+          },
+          {
+            "id": "312594f1-8d72-57d9-8433-090303092c91",
+            "version": "KqlParameterItem/1.0",
+            "name": "SelectedEnvironment",
+            "type": 1,
+            "isRequired": true,
+            "value": "*",
+            "label": "Selected environment (* for all)",
+            "isGlobal": true
+          },
+          {
+            "id": "50463e7f-f071-56ba-814f-d2443a06e392",
+            "version": "KqlParameterItem/1.0",
+            "name": "Environment",
+            "type": 2,
+            "isRequired": true,
+            "value": "*",
+            "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nunion (print value='*', label='All environments'), (resources | where isnotempty(Environment) | distinct Environment | project value=Environment, label=Environment)",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspaces}"
+            ]
+          },
+          {
+            "id": "80639984-ffb4-57cc-ba79-22a674345bfd",
+            "version": "KqlParameterItem/1.0",
+            "name": "StatusFilter",
+            "type": 2,
+            "isRequired": true,
+            "value": "*",
+            "jsonData": "[{\"value\": \"*\", \"label\": \"*\"}, {\"value\": \"red\", \"label\": \"red\"}, {\"value\": \"amber\", \"label\": \"amber\"}, {\"value\": \"grey\", \"label\": \"grey\"}, {\"value\": \"green\", \"label\": \"green\"}]"
+          },
+          {
+            "id": "0a46583c-a3d7-59e1-9857-6ba0fef064cb",
+            "version": "KqlParameterItem/1.0",
+            "name": "ResourceTypeFilter",
+            "type": 2,
+            "isRequired": true,
+            "value": "*",
+            "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nunion (print value='*', label='All types'), (resources | distinct ResourceType | project value=ResourceType, label=ResourceType)",
+            "queryType": 0,
+            "resourceType": "microsoft.operationalinsights/workspaces",
+            "crossComponentResources": [
+              "{Workspaces}"
+            ]
+          }
+        ],
+        "style": "above"
+      }
+    },
+    {
+      "type": 3,
+      "name": "coverage",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Collection coverage \u2014 inspect before interpreting status",
+        "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\n\nlet lastPublished = toscalar(allData | summarize max(SnapshotTime));\ncompleteRuns | top 1 by SnapshotTime desc\n| project SnapshotTime, LastPublished=lastPublished, ExpectedCount, ActualCount,\n    Coverage=case(SnapshotTime < lastPublished, 'PARTIAL LATEST RUN \u2014 showing previous complete snapshot',\n                  datetime_diff('second', now(), SnapshotTime) > FreshnessSeconds, 'STALE \u2014 health is unknown', 'Complete inventory snapshot'),\n    CollectionIssues, QueryTime=now()\n",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspaces}"
+        ],
+        "timeContext": {
+          "durationMs": 172800000
+        },
+        "visualization": "table",
+        "size": 0,
+        "noDataMessage": "No rows. Check collection coverage and filters; this does not mean healthy.",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 10000,
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "PlatformStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "ApplicationStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "AlertStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": 3,
+      "name": "environment-summary",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Environments \u2014 select a row to inspect resources",
+        "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nresources | where SubscriptionId in~ ({Subscriptions}) | where Classification != 'production' or base64_decode_tostring('{Visibility:base64}') == 'all' | where Classification !in ('shared', 'unassigned')\n| summarize Resources=count(), Red=countif(Status=='red'), Amber=countif(Status=='amber'), Unknown=countif(Status=='grey'), Green=countif(Status=='green'), LastSnapshot=min(SnapshotTime) by Environment, Classification\n| extend Status=case(Red>0, 'red', Amber>0, 'amber', Unknown>0, 'grey', 'green') | order by Environment asc",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspaces}"
+        ],
+        "timeContext": {
+          "durationMs": 172800000
+        },
+        "visualization": "table",
+        "size": 0,
+        "noDataMessage": "No rows. Check collection coverage and filters; this does not mean healthy.",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 10000,
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "PlatformStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "ApplicationStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "AlertStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "exportParameterName": "SelectedEnvironment",
+        "exportFieldName": "Environment",
+        "exportDefaultValue": "*"
+      }
+    },
+    {
+      "type": 3,
+      "name": "resources",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Environment resources",
+        "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nresources | where SubscriptionId in~ ({Subscriptions}) | where Classification != 'production' or base64_decode_tostring('{Visibility:base64}') == 'all' | where Classification !in ('shared', 'unassigned')\n| where base64_decode_tostring('{Environment:base64}') == '*' or Environment == base64_decode_tostring('{Environment:base64}')\n| where base64_decode_tostring('{SelectedEnvironment:base64}') == '*' or Environment == base64_decode_tostring('{SelectedEnvironment:base64}')\n| where base64_decode_tostring('{StatusFilter:base64}') == '*' or Status == base64_decode_tostring('{StatusFilter:base64}')\n| where base64_decode_tostring('{ResourceTypeFilter:base64}') == '*' or ResourceType =~ base64_decode_tostring('{ResourceTypeFilter:base64}')\n | order by StatusRank asc, Name asc | project Name, ResourceType, Environment, Classification, Status, PlatformStatus, ApplicationStatus, AlertStatus, Reason, AzureEvidenceAt, ApplicationEvidenceAt, AttributionSource, AttributionIssues, ResourceId",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspaces}"
+        ],
+        "timeContext": {
+          "durationMs": 172800000
+        },
+        "visualization": "table",
+        "size": 0,
+        "noDataMessage": "No rows. Check collection coverage and filters; this does not mean healthy.",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 10000,
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "PlatformStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "ApplicationStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "AlertStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": 3,
+      "name": "shared",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Shared resources",
+        "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nresources | where SubscriptionId in~ ({Subscriptions}) | where Classification == 'shared' | order by StatusRank asc, Name asc | project Name, ResourceType, Environment, Classification, Status, PlatformStatus, ApplicationStatus, AlertStatus, Reason, AzureEvidenceAt, ApplicationEvidenceAt, AttributionSource, AttributionIssues, ResourceId",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspaces}"
+        ],
+        "timeContext": {
+          "durationMs": 172800000
+        },
+        "visualization": "table",
+        "size": 0,
+        "noDataMessage": "No rows. Check collection coverage and filters; this does not mean healthy.",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 10000,
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "PlatformStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "ApplicationStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "AlertStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": 3,
+      "name": "unassigned",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Unassigned resources",
+        "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nresources | where SubscriptionId in~ ({Subscriptions}) | where Classification == 'unassigned' | order by StatusRank asc, Name asc | project Name, ResourceType, Environment, Classification, Status, PlatformStatus, ApplicationStatus, AlertStatus, Reason, AzureEvidenceAt, ApplicationEvidenceAt, AttributionSource, AttributionIssues, ResourceId",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspaces}"
+        ],
+        "timeContext": {
+          "durationMs": 172800000
+        },
+        "visualization": "table",
+        "size": 0,
+        "noDataMessage": "No rows. Check collection coverage and filters; this does not mean healthy.",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 10000,
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "PlatformStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "ApplicationStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "AlertStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": 3,
+      "name": "attribution-issues",
+      "content": {
+        "version": "KqlItem/1.0",
+        "title": "Tagging gaps and classification review",
+        "query": "// example-project is substituted with a validated project identifier by the generator.\nlet allData = materialize(EnvironmentOverview_CL\n    | where TimeGenerated > ago(2d) and ProjectId == 'example-project');\nlet observedCounts = allData | where RowKind == 'resource'\n    | summarize by RunId, ResourceId | summarize ActualCount=count() by RunId;\nlet completeRuns = allData | where RowKind == 'run' and HealthComplete == true\n    | summarize arg_max(TimeGenerated, *) by RunId\n    | join kind=leftouter observedCounts on RunId\n    | extend ActualCount=coalesce(ActualCount, long(0))\n    | where ExpectedCount == ActualCount;\nlet latestRun = toscalar(completeRuns | top 1 by SnapshotTime desc | project RunId);\nlet resources = allData | where RowKind == 'resource' and RunId == latestRun\n    | summarize arg_max(TimeGenerated, *) by ResourceId\n    | extend AgeSeconds=datetime_diff('second', now(), SnapshotTime),\n             AzureAge=datetime_diff('second', now(), AzureEvidenceAt),\n             ApplicationAge=datetime_diff('second', now(), ApplicationEvidenceAt)\n    | extend PlatformStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', PlatformStatus),\n             AlertStatus=iff(isnull(AzureEvidenceAt) or AzureAge > FreshnessSeconds or AzureAge < -60, 'grey', AlertStatus),\n             ApplicationStatus=case(ApplicationStatus == 'notApplicable', 'notApplicable',\n                isnull(ApplicationEvidenceAt) or ApplicationAge > FreshnessSeconds or ApplicationAge < -60, 'grey', ApplicationStatus)\n    | extend Status=case(PlatformStatus == 'red' or AlertStatus == 'red' or ApplicationStatus == 'red', 'red',\n                         PlatformStatus == 'amber' or AlertStatus == 'amber' or ApplicationStatus == 'amber', 'amber',\n                         PlatformStatus == 'grey' or AlertStatus == 'grey' or ApplicationStatus == 'grey', 'grey', 'green')\n    | extend Reason=iff(AgeSeconds > FreshnessSeconds, strcat('STALE SNAPSHOT \u2014 ', Reason), Reason),\n             StatusRank=case(Status == 'red', 0, Status == 'amber', 1, Status == 'grey', 2, 3);\n\nresources | where SubscriptionId in~ ({Subscriptions}) | where Classification != 'production' or base64_decode_tostring('{Visibility:base64}') == 'all' | where isnotempty(AttributionIssues) or Classification == 'unclassified' | order by StatusRank asc, Name asc | project Name, ResourceType, Environment, Classification, Status, PlatformStatus, ApplicationStatus, AlertStatus, Reason, AzureEvidenceAt, ApplicationEvidenceAt, AttributionSource, AttributionIssues, ResourceId",
+        "queryType": 0,
+        "resourceType": "microsoft.operationalinsights/workspaces",
+        "crossComponentResources": [
+          "{Workspaces}"
+        ],
+        "timeContext": {
+          "durationMs": 172800000
+        },
+        "visualization": "table",
+        "size": 0,
+        "noDataMessage": "No rows. Check collection coverage and filters; this does not mean healthy.",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 10000,
+          "formatters": [
+            {
+              "columnMatch": "Status",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "PlatformStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "ApplicationStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            },
+            {
+              "columnMatch": "AlertStatus",
+              "formatter": 18,
+              "formatOptions": {
+                "thresholdsOptions": "colors",
+                "thresholdsGrid": [
+                  {
+                    "operator": "==",
+                    "thresholdValue": "red",
+                    "representation": "redBright",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "amber",
+                    "representation": "yellow",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "green",
+                    "representation": "green",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "grey",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  },
+                  {
+                    "operator": "==",
+                    "thresholdValue": "notApplicable",
+                    "representation": "gray",
+                    "text": "{0}{1}"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": 1,
+      "name": "inventory-note",
+      "content": {
+        "json": "### Direct Azure inventory\nIndependent Resource Graph visibility for the selected subscriptions. This includes production and is not the health rollup. The count is authoritative for the query scope; the list below is deliberately capped at 1,000 rows. Narrow the scope for larger estates. Azure only returns resources the querying identity can read; a successful query cannot prove full RBAC coverage."
+      }
+    },
+    {
+      "type": 3,
+      "name": "live-inventory-count",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Resources | summarize VisibleResources=count() by subscriptionId",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "visualization": "table"
+      }
+    },
+    {
+      "type": 3,
+      "name": "live-inventory",
+      "content": {
+        "version": "KqlItem/1.0",
+        "query": "Resources | project id, name, type, resourceGroup, subscriptionId, tags | order by id asc | take 1000",
+        "queryType": 1,
+        "resourceType": "microsoft.resourcegraph/resources",
+        "crossComponentResources": [
+          "{Subscriptions}"
+        ],
+        "visualization": "table",
+        "gridSettings": {
+          "filter": true,
+          "rowLimit": 1000
+        }
+      }
+    },
+    {
+      "type": 1,
+      "name": "limits",
+      "content": {
+        "json": "Health is based on configured checks, not an expected deployment manifest. All discovered types appear; unsupported health sources remain unknown. Health grids display up to 10,000 rows: use filters or exported queries for larger sets. Environment summaries count the full snapshot. Snapshots are queried over the past two days; an empty result is a monitoring gap, not a healthy environment."
+      }
+    }
+  ],
+  "isLocked": true,
+  "defaultResourceIds": [
+    "/subscriptions/00000000-0000-0000-0000-000000000002/resourceGroups/monitoring/providers/Microsoft.OperationalInsights/workspaces/overview"
+  ],
+  "$schema": "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}

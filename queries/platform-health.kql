@@ -1,0 +1,4 @@
+HealthResources
+| where type =~ 'microsoft.resourcehealth/availabilitystatuses'
+| project id, resourceId=tolower(tostring(properties.targetResourceId)), availabilityState=tostring(properties.availabilityState), reason=tostring(properties.summary)
+| order by id asc

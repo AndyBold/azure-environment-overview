@@ -1,0 +1,3 @@
+Resources
+| project id, name, type, subscriptionId, resourceGroup, location, tags, properties
+| order by id asc
